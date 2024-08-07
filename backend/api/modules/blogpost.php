@@ -9,6 +9,7 @@ class BlogPost {
     private $table_name = 'blog_posts';
     private $tags_table = 'tags'; 
     private $blog_post_tags_table = 'blog_post_tags'; 
+    private $users_table = 'users';
 
     public $id;
     public $title;
@@ -25,18 +26,16 @@ class BlogPost {
     }
 
     public function create() {
-        $query = "INSERT INTO " . $this->table_name . " SET title=:title, description=:description, image=:image, user_id=:user_id, date_uploaded=NOW()";
+        $query = "INSERT INTO " . $this->table_name . " SET title=:title, description=:description, user_id=:user_id, date_uploaded=NOW()";
 
         $stmt = $this->conn->prepare($query);
 
         $this->title = htmlspecialchars(strip_tags($this->title));
         $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->image = htmlspecialchars(strip_tags($this->image));
         $this->user_id = htmlspecialchars(strip_tags($this->user_id));
 
         $stmt->bindParam(':title', $this->title);
         $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':image', $this->image);
         $stmt->bindParam(':user_id', $this->user_id);
 
         if ($stmt->execute()) {
@@ -54,8 +53,27 @@ class BlogPost {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    public function getBlogImage($post_id) {
+        $query = "SELECT image FROM " . $this->table_name . " WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $post_id);
+        $stmt->execute();
+    
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+        if ($row && $row['image'] !== null) {
+            header('Content-Type: image/png');
+            header('Cache-Control: no-cache, no-store, must-revalidate');
+            echo $row['image'];
+            exit();
+        } else {
+            echo "Blog image not found or not uploaded.";
+            http_response_code(404);
+        }
+    }
+
     public function update($tags = []) {
-        $query = "UPDATE " . $this->table_name . " SET title=:title, description=:description, image=:image WHERE id = :id";
+        $query = "UPDATE " . $this->table_name . " SET title=:title, description=:description WHERE id = :id";
 
         $stmt = $this->conn->prepare($query);
 
@@ -66,7 +84,6 @@ class BlogPost {
 
         $stmt->bindParam(':title', $this->title);
         $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':image', $this->image);
         $stmt->bindParam(':id', $this->id);
 
         if ($stmt->execute()) {
@@ -127,10 +144,11 @@ class BlogPost {
     }
 
     public function getAll() {
-        $query = "SELECT bp.*, GROUP_CONCAT(t.tag SEPARATOR ', ') as tags
+        $query = "SELECT bp.*, u.username as author, GROUP_CONCAT(t.tag SEPARATOR ', ') as tags
                   FROM " . $this->table_name . " bp
                   LEFT JOIN " . $this->blog_post_tags_table . " bpt ON bp.id = bpt.post_id
                   LEFT JOIN " . $this->tags_table . " t ON bpt.tag_id = t.id
+                  LEFT JOIN " . $this->users_table . " u ON bp.user_id = u.id
                   GROUP BY bp.id";
 
         $stmt = $this->conn->prepare($query);

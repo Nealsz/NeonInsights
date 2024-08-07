@@ -126,24 +126,24 @@ if ($requestMethod === 'PUT') {
     }
 
     // Blog Update Endpoint
-    if (strpos($requestUri, '/api/blog/update') !== false) {
-        if (!empty($data->id) && !empty($data->title) && !empty($data->description) && !empty($data->user_id)) {
-            $blogPost = new BlogPost($db);
-            $blogPost->id = $data->id;
-            $blogPost->title = $data->title;
-            $blogPost->description = $data->description;
-            $blogPost->image = $data->image;
-            $blogPost->user_id = $data->user_id;
-
-            $tags = isset($data->tags) ? $data->tags : [];
-
-            if ($blogPost->update($tags)) {
-                GlobalMethods::sendPayload(array("message" => "Blog post was updated."), 200);
-            } else {
-                GlobalMethods::sendPayload(array("message" => "Unable to update blog post."), 503);
-            }
+    if (strpos($requestUri, '/api/blog/update') !== false && $_SERVER['REQUEST_METHOD'] === 'PUT') {
+        $id = $_POST['id'];
+        $title = $_POST['title'];
+        $description = $_POST['description'];
+        $user_id = $_POST['user_id'];
+    
+        $tags = isset($_POST['tags']) ? explode(',', $_POST['tags']) : [];
+    
+        $blogPost = new BlogPost($db);
+        $blogPost->id = $id;
+        $blogPost->title = $title;
+        $blogPost->description = $description;
+        $blogPost->user_id = $user_id;
+    
+        if ($blogPost->update($tags)) {
+            GlobalMethods::sendPayload(array("message" => "Blog post was updated."), 200);
         } else {
-            GlobalMethods::sendPayload(array("message" => "Incomplete data."), 400);
+            GlobalMethods::sendPayload(array("message" => "Unable to update blog post."), 503);
         }
     }
 }
@@ -174,10 +174,30 @@ if ($requestMethod === 'PATCH') {
 
 if ($requestMethod === 'GET') {
     // Fetch All Blogs Endpoint
-    if (strpos($requestUri, '/api/blogs') !== false && strpos($requestUri, '/search') === false) {
+    if (strpos($requestUri, '/api/blogs') !== false && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $title = $_POST['title'];
+        $description = $_POST['description'];
+        $user_id = $_POST['user_id'];
+    
+        $image = null;
+        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $image = file_get_contents($_FILES['image']['tmp_name']);
+        }
+    
         $blogPost = new BlogPost($db);
-        $blogs = $blogPost->getAll();
-        GlobalMethods::sendPayload($blogs, 200);
+        if ($blogPost->create($title, $description, $user_id, $image)) {
+            GlobalMethods::sendPayload(["message" => "Blog post created successfully."], 201);
+        } else {
+            GlobalMethods::sendPayload(["message" => "Failed to create blog post."], 500);
+        }
+    }
+
+    // Blog Image Endpoint
+
+    if (strpos($requestUri, '/api/blogs/image') !== false && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        $postId = $_GET['id'];
+        $blogPost = new BlogPost($db);
+        $blogPost->getBlogImage($postId);
     }
 
     // Search Blogs by Tag Endpoint
